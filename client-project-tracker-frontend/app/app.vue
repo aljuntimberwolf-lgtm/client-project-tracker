@@ -9,6 +9,8 @@ const {
 } = await useFetch(`${config.public.apiBase}/projects`)
 
 const showForm = ref(false)
+const editingProjectId = ref<number | null>(null)
+const formError = ref('')
 
 const form = ref({
   client_name: '',
@@ -20,106 +22,249 @@ const form = ref({
   due_date: ''
 })
 
-const formError = ref('')
+function resetForm() {
+  form.value = {
+    client_name: '',
+    project_name: '',
+    description: '',
+    status: 'Planning',
+    priority: 'Medium',
+    start_date: '',
+    due_date: ''
+  }
 
-async function createProject() {
+  formError.value = ''
+  editingProjectId.value = null
+}
+
+function editProject(project: any) {
+  editingProjectId.value = project.id
+
+  form.value = {
+    client_name: project.client_name,
+    project_name: project.project_name,
+    description: project.description || '',
+    status: project.status,
+    priority: project.priority,
+    start_date: project.start_date.substring(0, 10),
+    due_date: project.due_date.substring(0, 10)
+  }
+
+  formError.value = ''
+  showForm.value = true
+}
+
+function cancelForm() {
+  showForm.value = false
+  resetForm()
+}
+
+async function saveProject() {
   formError.value = ''
 
   try {
-    await $fetch(`${config.public.apiBase}/projects`, {
-      method: 'POST',
-      body: form.value,
-      headers: {
-        Accept: 'application/json'
-      }
-    })
-
-    form.value = {
-      client_name: '',
-      project_name: '',
-      description: '',
-      status: 'Planning',
-      priority: 'Medium',
-      start_date: '',
-      due_date: ''
+    if (editingProjectId.value) {
+      await $fetch(
+        `${config.public.apiBase}/projects/${editingProjectId.value}`,
+        {
+          method: 'PUT',
+          body: form.value,
+          headers: {
+            Accept: 'application/json'
+          }
+        }
+      )
+    } else {
+      await $fetch(`${config.public.apiBase}/projects`, {
+        method: 'POST',
+        body: form.value,
+        headers: {
+          Accept: 'application/json'
+        }
+      })
     }
 
     showForm.value = false
+    resetForm()
 
     await refresh()
   } catch (error: any) {
-    formError.value =
-      error?.data?.message || 'Failed to create project.'
+    if (error?.data?.errors) {
+      const errors = error.data.errors
+
+      formError.value = Object.values(errors)
+        .flat()
+        .join(' ')
+    } else {
+      formError.value =
+        error?.data?.message || 'Failed to save project.'
+    }
+  }
+}
+
+async function deleteProject(id: number) {
+  const confirmed = confirm(
+    'Are you sure you want to delete this project?'
+  )
+
+  if (!confirmed) {
+    return
+  }
+
+  try {
+    await $fetch(
+      `${config.public.apiBase}/projects/${id}`,
+      {
+        method: 'DELETE',
+        headers: {
+          Accept: 'application/json'
+        }
+      }
+    )
+
+    await refresh()
+  } catch (error: any) {
+    alert(
+      error?.data?.message ||
+      'Failed to delete project.'
+    )
   }
 }
 </script>
 
 <template>
   <div class="container">
+
+    <!-- Header -->
     <div class="header">
       <h1>Client Project Tracker</h1>
 
-      <button @click="showForm = !showForm">
+      <button
+        class="primary-button"
+        @click="
+          showForm = !showForm;
+          if (!showForm) resetForm()
+        "
+      >
         {{ showForm ? 'Cancel' : '+ Add Project' }}
       </button>
     </div>
 
+    <!-- Project Form -->
     <div v-if="showForm" class="form-container">
-      <h2>Add Project</h2>
+
+      <h2>
+        {{ editingProjectId ? 'Edit Project' : 'Add Project' }}
+      </h2>
 
       <p v-if="formError" class="error">
         {{ formError }}
       </p>
 
-      <form @submit.prevent="createProject">
+      <form @submit.prevent="saveProject">
+
+        <!-- Client Name -->
         <div class="form-group">
-          <label>Client Name</label>
+          <label for="client_name">
+            Client Name
+          </label>
+
           <input
+            id="client_name"
             v-model="form.client_name"
             type="text"
             required
           />
         </div>
 
+        <!-- Project Name -->
         <div class="form-group">
-          <label>Project Name</label>
+          <label for="project_name">
+            Project Name
+          </label>
+
           <input
+            id="project_name"
             v-model="form.project_name"
             type="text"
             required
           />
         </div>
 
+        <!-- Description -->
         <div class="form-group">
-          <label>Description</label>
+          <label for="description">
+            Description
+          </label>
+
           <textarea
+            id="description"
             v-model="form.description"
           ></textarea>
         </div>
 
+        <!-- Status -->
         <div class="form-group">
-          <label>Status</label>
-          <select v-model="form.status">
-            <option value="Planning">Planning</option>
-            <option value="In Progress">In Progress</option>
-            <option value="On Hold">On Hold</option>
-            <option value="Completed">Completed</option>
+          <label for="status">
+            Status
+          </label>
+
+          <select
+            id="status"
+            v-model="form.status"
+          >
+            <option value="Planning">
+              Planning
+            </option>
+
+            <option value="In Progress">
+              In Progress
+            </option>
+
+            <option value="On Hold">
+              On Hold
+            </option>
+
+            <option value="Completed">
+              Completed
+            </option>
           </select>
         </div>
 
+        <!-- Priority -->
         <div class="form-group">
-          <label>Priority</label>
-          <select v-model="form.priority">
-            <option value="Low">Low</option>
-            <option value="Medium">Medium</option>
-            <option value="High">High</option>
+          <label for="priority">
+            Priority
+          </label>
+
+          <select
+            id="priority"
+            v-model="form.priority"
+          >
+            <option value="Low">
+              Low
+            </option>
+
+            <option value="Medium">
+              Medium
+            </option>
+
+            <option value="High">
+              High
+            </option>
           </select>
         </div>
 
+        <!-- Dates -->
         <div class="date-row">
+
           <div class="form-group">
-            <label>Start Date</label>
+            <label for="start_date">
+              Start Date
+            </label>
+
             <input
+              id="start_date"
               v-model="form.start_date"
               type="date"
               required
@@ -127,35 +272,50 @@ async function createProject() {
           </div>
 
           <div class="form-group">
-            <label>Due Date</label>
+            <label for="due_date">
+              Due Date
+            </label>
+
             <input
+              id="due_date"
               v-model="form.due_date"
               type="date"
               required
             />
           </div>
+
         </div>
 
-        <button type="submit">
-          Create Project
+        <!-- Submit -->
+        <button
+          type="submit"
+          class="primary-button"
+        >
+          {{ editingProjectId ? 'Update Project' : 'Create Project' }}
         </button>
+
       </form>
     </div>
 
+    <!-- Loading -->
     <p v-if="pending">
       Loading projects...
     </p>
 
-    <p v-else-if="error">
+    <!-- API Error -->
+    <p v-else-if="error" class="error">
       Failed to load projects.
     </p>
 
+    <!-- Projects -->
     <div v-else>
+
       <p v-if="!projects?.length">
         No projects found.
       </p>
 
       <table v-else>
+
         <thead>
           <tr>
             <th>ID</th>
@@ -165,25 +325,71 @@ async function createProject() {
             <th>Priority</th>
             <th>Start Date</th>
             <th>Due Date</th>
+            <th>Actions</th>
           </tr>
         </thead>
 
         <tbody>
+
           <tr
             v-for="project in projects"
             :key="project.id"
           >
-            <td>{{ project.id }}</td>
-            <td>{{ project.client_name }}</td>
-            <td>{{ project.project_name }}</td>
-            <td>{{ project.status }}</td>
-            <td>{{ project.priority }}</td>
-            <td>{{ project.start_date }}</td>
-            <td>{{ project.due_date }}</td>
+
+            <td>
+              {{ project.id }}
+            </td>
+
+            <td>
+              {{ project.client_name }}
+            </td>
+
+            <td>
+              {{ project.project_name }}
+            </td>
+
+            <td>
+              {{ project.status }}
+            </td>
+
+            <td>
+              {{ project.priority }}
+            </td>
+
+            <td>
+              {{ project.start_date.substring(0, 10) }}
+            </td>
+
+            <td>
+              {{ project.due_date.substring(0, 10) }}
+            </td>
+
+            <td class="actions">
+
+              <button
+                class="edit-button"
+                @click="editProject(project)"
+              >
+                Edit
+              </button>
+
+              <button
+                class="delete-button"
+                @click="deleteProject(project.id)"
+              >
+                Delete
+              </button>
+
+            </td>
+
           </tr>
+
         </tbody>
+
       </table>
+
     </div>
+
   </div>
 </template>
 
@@ -207,12 +413,30 @@ body {
   margin-bottom: 25px;
 }
 
+.header h1 {
+  margin: 0;
+}
+
 button {
-  padding: 10px 16px;
+  padding: 9px 14px;
   border: none;
   border-radius: 4px;
   cursor: pointer;
+}
+
+.primary-button {
   background: #111827;
+  color: white;
+}
+
+.edit-button {
+  background: #2563eb;
+  color: white;
+  margin-right: 6px;
+}
+
+.delete-button {
+  background: #dc2626;
   color: white;
 }
 
@@ -221,6 +445,10 @@ button {
   padding: 25px;
   margin-bottom: 30px;
   border-radius: 6px;
+}
+
+.form-container h2 {
+  margin-top: 0;
 }
 
 .form-group {
@@ -274,5 +502,9 @@ td {
 
 th {
   background: #f0f0f0;
+}
+
+.actions {
+  white-space: nowrap;
 }
 </style>
