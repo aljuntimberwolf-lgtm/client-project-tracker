@@ -1,4 +1,6 @@
 <script setup lang="ts">
+const MIN_PENDING_MS = 500
+
 const config = useRuntimeConfig()
 
 const {
@@ -9,6 +11,7 @@ const {
 } = await useFetch(`${config.public.apiBase}/projects`)
 
 const showModal = ref(false)
+const isSaving = ref(false)
 const modalRef = ref<any | null>(null)
 const editingProject = ref<any | null>(null)
 const formError = ref('')
@@ -39,6 +42,12 @@ function closeModal() {
 async function saveProject(formData: any) {
   formError.value = ''
 
+  const startedAt = Date.now()
+
+  isSaving.value = true
+
+  let saved = false
+
   try {
     if (editingProject.value) {
       await $fetch(
@@ -64,9 +73,7 @@ async function saveProject(formData: any) {
       )
     }
 
-    closeModal()
-
-    await refresh()
+    saved = true
   } catch (error: any) {
     if (error?.data?.errors) {
       const errors = error.data.errors
@@ -80,20 +87,47 @@ async function saveProject(formData: any) {
         'Failed to save project.'
     }
   }
+
+  const remaining =
+    MIN_PENDING_MS - (Date.now() - startedAt)
+
+  if (remaining > 0) {
+    await new Promise((resolve) =>
+      setTimeout(resolve, remaining)
+    )
+  }
+
+  isSaving.value = false
+
+  if (saved) {
+    closeModal()
+
+    await refresh()
+  }
 }
 
-async function deleteProject(id: number) {
-  const confirmed = confirm(
-    'Are you sure you want to delete this project?'
-  )
+function openDeleteModal(project: any) {
+  deletingProject.value = project
+  deleteError.value = ''
+}
 
-  if (!confirmed) {
-    return
-  }
+function closeDeleteModal() {
+  deletingProject.value = null
+  deleteError.value = ''
+  isDeleting.value = false
+}
+
+async function deleteProject() {
+  const startedAt = Date.now()
+
+  isDeleting.value = true
+  deleteError.value = ''
+
+  let deleted = false
 
   try {
     await $fetch(
-      `${config.public.apiBase}/projects/${id}`,
+      `${config.public.apiBase}/projects/${deletingProject.value.id}`,
       {
         method: 'DELETE',
         headers: {
@@ -102,12 +136,28 @@ async function deleteProject(id: number) {
       }
     )
 
-    await refresh()
+    deleted = true
   } catch (error: any) {
-    alert(
+    deleteError.value =
       error?.data?.message ||
       'Failed to delete project.'
+  }
+
+  const remaining =
+    MIN_PENDING_MS - (Date.now() - startedAt)
+
+  if (remaining > 0) {
+    await new Promise((resolve) =>
+      setTimeout(resolve, remaining)
     )
+  }
+
+  isDeleting.value = false
+
+  if (deleted) {
+    closeDeleteModal()
+
+    await refresh()
   }
 }
 
@@ -278,6 +328,7 @@ const filteredProjects = computed(() => {
         ref="modalRef"
         :project="editingProject"
         :error="formError"
+        :pending="isSaving"
         @save="saveProject"
         @close="closeModal"
       />

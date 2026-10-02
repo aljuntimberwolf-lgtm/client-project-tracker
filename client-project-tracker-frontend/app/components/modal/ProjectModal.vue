@@ -2,6 +2,7 @@
 const props = defineProps<{
   project?: any | null
   error?: string
+  pending?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -72,6 +73,10 @@ function submitForm() {
 }
 
 function requestClose() {
+  if (props.pending) {
+    return
+  }
+
   if (isDirty.value) {
     showDiscardPrompt.value = true
 
@@ -156,6 +161,7 @@ defineExpose({ requestClose })
             type="button"
             class="modal-close"
             aria-label="Close"
+            :disabled="pending"
             @click="requestClose"
           >
             &times;
@@ -172,6 +178,7 @@ defineExpose({ requestClose })
 
         <form
           class="project-form"
+          :aria-busy="pending"
           @submit.prevent="submitForm"
         >
 
@@ -188,6 +195,7 @@ defineExpose({ requestClose })
                 v-model="form.client_name"
                 type="text"
                 placeholder="Enter client name"
+                :disabled="pending"
                 required
               />
             </div>
@@ -203,6 +211,7 @@ defineExpose({ requestClose })
                 v-model="form.project_name"
                 type="text"
                 placeholder="Enter project name"
+                :disabled="pending"
                 required
               />
             </div>
@@ -216,6 +225,7 @@ defineExpose({ requestClose })
               <select
                 id="status"
                 v-model="form.status"
+                :disabled="pending"
               >
                 <option value="Planning">
                   Planning
@@ -244,6 +254,7 @@ defineExpose({ requestClose })
               <select
                 id="priority"
                 v-model="form.priority"
+                :disabled="pending"
               >
                 <option value="Low">
                   Low
@@ -269,6 +280,7 @@ defineExpose({ requestClose })
                 id="start_date"
                 v-model="form.start_date"
                 type="date"
+                :disabled="pending"
                 required
               />
             </div>
@@ -283,6 +295,7 @@ defineExpose({ requestClose })
                 id="due_date"
                 v-model="form.due_date"
                 type="date"
+                :disabled="pending"
                 required
               />
             </div>
@@ -299,6 +312,7 @@ defineExpose({ requestClose })
               id="description"
               v-model="form.description"
               placeholder="Enter project description"
+              :disabled="pending"
               rows="4"
             ></textarea>
           </div>
@@ -308,6 +322,7 @@ defineExpose({ requestClose })
             <button
               type="button"
               class="secondary-button"
+              :disabled="pending"
               @click="requestClose"
             >
               Cancel
@@ -316,11 +331,22 @@ defineExpose({ requestClose })
             <button
               type="submit"
               class="primary-button"
+              :disabled="pending"
             >
+              <span
+                v-if="pending"
+                class="button-spinner"
+                aria-hidden="true"
+              ></span>
+
               {{
-                isEditing
-                  ? 'Update Project'
-                  : 'Create Project'
+                pending
+                  ? isEditing
+                    ? 'Updating...'
+                    : 'Creating...'
+                  : isEditing
+                    ? 'Update Project'
+                    : 'Create Project'
               }}
             </button>
           </div>
@@ -391,6 +417,34 @@ defineExpose({ requestClose })
 .modal-close:hover {
   background: #f1f5f9;
   color: #111827;
+}
+
+.modal-close:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.project-form button:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.button-spinner {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  margin-right: 8px;
+  vertical-align: -2px;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 @media (max-width: 700px) {
