@@ -9,7 +9,7 @@ const {
 } = await useFetch(`${config.public.apiBase}/projects`)
 
 const showForm = ref(false)
-const editingProjectId = ref<number | null>(null)
+const editingProject = ref<any | null>(null)
 const formError = ref('')
 
 const search = ref('')
@@ -17,85 +17,53 @@ const statusFilter = ref('')
 const priorityFilter = ref('')
 const sortBy = ref('')
 
-const form = ref({
-  client_name: '',
-  project_name: '',
-  description: '',
-  status: 'Planning',
-  priority: 'Medium',
-  start_date: '',
-  due_date: ''
-})
-
-function resetForm() {
-  form.value = {
-    client_name: '',
-    project_name: '',
-    description: '',
-    status: 'Planning',
-    priority: 'Medium',
-    start_date: '',
-    due_date: ''
-  }
-
-  formError.value = ''
-  editingProjectId.value = null
-}
-
 function openAddForm() {
-  resetForm()
+  editingProject.value = null
+  formError.value = ''
   showForm.value = true
 }
 
 function editProject(project: any) {
-  editingProjectId.value = project.id
-
-  form.value = {
-    client_name: project.client_name,
-    project_name: project.project_name,
-    description: project.description || '',
-    status: project.status,
-    priority: project.priority,
-    start_date: project.start_date.substring(0, 10),
-    due_date: project.due_date.substring(0, 10)
-  }
-
+  editingProject.value = project
   formError.value = ''
   showForm.value = true
 }
 
 function cancelForm() {
   showForm.value = false
-  resetForm()
+  editingProject.value = null
+  formError.value = ''
 }
 
-async function saveProject() {
+async function saveProject(formData: any) {
   formError.value = ''
 
   try {
-    if (editingProjectId.value) {
+    if (editingProject.value) {
       await $fetch(
-        `${config.public.apiBase}/projects/${editingProjectId.value}`,
+        `${config.public.apiBase}/projects/${editingProject.value.id}`,
         {
           method: 'PUT',
-          body: form.value,
+          body: formData,
           headers: {
             Accept: 'application/json'
           }
         }
       )
     } else {
-      await $fetch(`${config.public.apiBase}/projects`, {
-        method: 'POST',
-        body: form.value,
-        headers: {
-          Accept: 'application/json'
+      await $fetch(
+        `${config.public.apiBase}/projects`,
+        {
+          method: 'POST',
+          body: formData,
+          headers: {
+            Accept: 'application/json'
+          }
         }
-      })
+      )
     }
 
-    showForm.value = false
-    resetForm()
+    cancelForm()
 
     await refresh()
   } catch (error: any) {
@@ -107,7 +75,8 @@ async function saveProject() {
         .join(' ')
     } else {
       formError.value =
-        error?.data?.message || 'Failed to save project.'
+        error?.data?.message ||
+        'Failed to save project.'
     }
   }
 }
@@ -150,90 +119,116 @@ const filteredProjects = computed(() => {
     .trim()
     .toLowerCase()
 
-  const filtered = projects.value.filter((project: any) => {
-    const matchesSearch =
-      !searchValue ||
-      project.client_name
-        .toLowerCase()
-        .includes(searchValue) ||
-      project.project_name
-        .toLowerCase()
-        .includes(searchValue) ||
-      (project.description || '')
-        .toLowerCase()
-        .includes(searchValue)
+  const filtered = projects.value.filter(
+    (project: any) => {
+      const matchesSearch =
+        !searchValue ||
+        project.client_name
+          .toLowerCase()
+          .includes(searchValue) ||
+        project.project_name
+          .toLowerCase()
+          .includes(searchValue) ||
+        (project.description || '')
+          .toLowerCase()
+          .includes(searchValue)
 
-    const matchesStatus =
-      !statusFilter.value ||
-      project.status === statusFilter.value
+      const matchesStatus =
+        !statusFilter.value ||
+        project.status === statusFilter.value
 
-    const matchesPriority =
-      !priorityFilter.value ||
-      project.priority === priorityFilter.value
+      const matchesPriority =
+        !priorityFilter.value ||
+        project.priority === priorityFilter.value
 
-    return (
-      matchesSearch &&
-      matchesStatus &&
-      matchesPriority
-    )
-  })
-
-  return filtered.sort((a: any, b: any) => {
-    switch (sortBy.value) {
-      case 'client_asc':
-        return a.client_name.localeCompare(b.client_name)
-
-      case 'client_desc':
-        return b.client_name.localeCompare(a.client_name)
-
-      case 'project_asc':
-        return a.project_name.localeCompare(b.project_name)
-
-      case 'project_desc':
-        return b.project_name.localeCompare(a.project_name)
-
-      case 'start_asc':
-        return a.start_date.localeCompare(b.start_date)
-
-      case 'start_desc':
-        return b.start_date.localeCompare(a.start_date)
-
-      case 'due_asc':
-        return a.due_date.localeCompare(b.due_date)
-
-      case 'due_desc':
-        return b.due_date.localeCompare(a.due_date)
-
-      case 'priority_asc': {
-        const priorityOrder: Record<string, number> = {
-          Low: 1,
-          Medium: 2,
-          High: 3
-        }
-
-        return (
-          priorityOrder[a.priority] -
-          priorityOrder[b.priority]
-        )
-      }
-
-      case 'priority_desc': {
-        const priorityOrder: Record<string, number> = {
-          Low: 1,
-          Medium: 2,
-          High: 3
-        }
-
-        return (
-          priorityOrder[b.priority] -
-          priorityOrder[a.priority]
-        )
-      }
-
-      default:
-        return 0
+      return (
+        matchesSearch &&
+        matchesStatus &&
+        matchesPriority
+      )
     }
-  })
+  )
+
+  return filtered.sort(
+    (a: any, b: any) => {
+      switch (sortBy.value) {
+        case 'client_asc':
+          return a.client_name.localeCompare(
+            b.client_name
+          )
+
+        case 'client_desc':
+          return b.client_name.localeCompare(
+            a.client_name
+          )
+
+        case 'project_asc':
+          return a.project_name.localeCompare(
+            b.project_name
+          )
+
+        case 'project_desc':
+          return b.project_name.localeCompare(
+            a.project_name
+          )
+
+        case 'start_asc':
+          return a.start_date.localeCompare(
+            b.start_date
+          )
+
+        case 'start_desc':
+          return b.start_date.localeCompare(
+            a.start_date
+          )
+
+        case 'due_asc':
+          return a.due_date.localeCompare(
+            b.due_date
+          )
+
+        case 'due_desc':
+          return b.due_date.localeCompare(
+            a.due_date
+          )
+
+        case 'priority_asc': {
+          const priorityOrder: Record<
+            string,
+            number
+          > = {
+            Low: 1,
+            Medium: 2,
+            High: 3
+          }
+
+          return (
+            priorityOrder[a.priority] -
+            priorityOrder[b.priority]
+          )
+        }
+
+        case 'priority_desc': {
+          const priorityOrder: Record<
+            string,
+            number
+          > = {
+            Low: 1,
+            Medium: 2,
+            High: 3
+          }
+
+          return (
+            priorityOrder[b.priority] -
+            priorityOrder[a.priority]
+          )
+        }
+
+        default:
+          return 0
+      }
+    }
+  )
 })
 </script>
 
@@ -261,334 +256,37 @@ const filteredProjects = computed(() => {
 
         <button
           class="primary-button"
-          @click="showForm ? cancelForm() : openAddForm()"
+          @click="
+            showForm
+              ? cancelForm()
+              : openAddForm()
+          "
         >
-          <span>
-            {{ showForm ? 'Cancel' : '+ Add Project' }}
-          </span>
+          {{
+            showForm
+              ? 'Cancel'
+              : '+ Add Project'
+          }}
         </button>
 
       </header>
 
-      <!-- Project Form -->
-      <section
+      <!-- Form -->
+      <ProjectForm
         v-if="showForm"
-        class="card form-card"
-      >
-
-        <div class="section-header">
-          <div>
-            <h2>
-              {{ editingProjectId ? 'Edit Project' : 'Add Project' }}
-            </h2>
-
-            <p>
-              {{
-                editingProjectId
-                  ? 'Update the project information below.'
-                  : 'Enter the project information below.'
-              }}
-            </p>
-          </div>
-        </div>
-
-        <div
-          v-if="formError"
-          class="error-message"
-        >
-          {{ formError }}
-        </div>
-
-        <form
-          @submit.prevent="saveProject"
-          class="project-form"
-        >
-
-          <div class="form-grid">
-
-            <!-- Client -->
-            <div class="form-group">
-              <label for="client_name">
-                Client Name
-              </label>
-
-              <input
-                id="client_name"
-                v-model="form.client_name"
-                type="text"
-                placeholder="Enter client name"
-                required
-              />
-            </div>
-
-            <!-- Project -->
-            <div class="form-group">
-              <label for="project_name">
-                Project Name
-              </label>
-
-              <input
-                id="project_name"
-                v-model="form.project_name"
-                type="text"
-                placeholder="Enter project name"
-                required
-              />
-            </div>
-
-            <!-- Status -->
-            <div class="form-group">
-              <label for="status">
-                Status
-              </label>
-
-              <select
-                id="status"
-                v-model="form.status"
-              >
-                <option value="Planning">
-                  Planning
-                </option>
-
-                <option value="In Progress">
-                  In Progress
-                </option>
-
-                <option value="On Hold">
-                  On Hold
-                </option>
-
-                <option value="Completed">
-                  Completed
-                </option>
-              </select>
-            </div>
-
-            <!-- Priority -->
-            <div class="form-group">
-              <label for="priority">
-                Priority
-              </label>
-
-              <select
-                id="priority"
-                v-model="form.priority"
-              >
-                <option value="Low">
-                  Low
-                </option>
-
-                <option value="Medium">
-                  Medium
-                </option>
-
-                <option value="High">
-                  High
-                </option>
-              </select>
-            </div>
-
-            <!-- Start Date -->
-            <div class="form-group">
-              <label for="start_date">
-                Start Date
-              </label>
-
-              <input
-                id="start_date"
-                v-model="form.start_date"
-                type="date"
-                required
-              />
-            </div>
-
-            <!-- Due Date -->
-            <div class="form-group">
-              <label for="due_date">
-                Due Date
-              </label>
-
-              <input
-                id="due_date"
-                v-model="form.due_date"
-                type="date"
-                required
-              />
-            </div>
-
-          </div>
-
-          <!-- Description -->
-          <div class="form-group">
-            <label for="description">
-              Description
-            </label>
-
-            <textarea
-              id="description"
-              v-model="form.description"
-              placeholder="Enter project description"
-              rows="4"
-            ></textarea>
-          </div>
-
-          <div class="form-actions">
-
-            <button
-              type="button"
-              class="secondary-button"
-              @click="cancelForm"
-            >
-              Cancel
-            </button>
-
-            <button
-              type="submit"
-              class="primary-button"
-            >
-              {{
-                editingProjectId
-                  ? 'Update Project'
-                  : 'Create Project'
-              }}
-            </button>
-
-          </div>
-
-        </form>
-
-      </section>
+        :project="editingProject"
+        :error="formError"
+        @save="saveProject"
+        @cancel="cancelForm"
+      />
 
       <!-- Filters -->
-      <section class="card filters-card">
-
-        <div class="filter-item search-item">
-          <label for="search">
-            Search
-          </label>
-
-          <input
-            id="search"
-            v-model="search"
-            type="text"
-            placeholder="Search client, project, or description..."
-          />
-        </div>
-
-        <div class="filter-item">
-          <label for="status-filter">
-            Status
-          </label>
-
-          <select
-            id="status-filter"
-            v-model="statusFilter"
-          >
-            <option value="">
-              All Statuses
-            </option>
-
-            <option value="Planning">
-              Planning
-            </option>
-
-            <option value="In Progress">
-              In Progress
-            </option>
-
-            <option value="On Hold">
-              On Hold
-            </option>
-
-            <option value="Completed">
-              Completed
-            </option>
-          </select>
-        </div>
-
-        <div class="filter-item">
-          <label for="priority-filter">
-            Priority
-          </label>
-
-          <select
-            id="priority-filter"
-            v-model="priorityFilter"
-          >
-            <option value="">
-              All Priorities
-            </option>
-
-            <option value="Low">
-              Low
-            </option>
-
-            <option value="Medium">
-              Medium
-            </option>
-
-            <option value="High">
-              High
-            </option>
-          </select>
-        </div>
-
-        <div class="filter-item">
-          <label for="sort">
-            Sort By
-          </label>
-
-          <select
-            id="sort"
-            v-model="sortBy"
-          >
-            <option value="">
-              Default
-            </option>
-
-            <option value="client_asc">
-              Client Name A → Z
-            </option>
-
-            <option value="client_desc">
-              Client Name Z → A
-            </option>
-
-            <option value="project_asc">
-              Project Name A → Z
-            </option>
-
-            <option value="project_desc">
-              Project Name Z → A
-            </option>
-
-            <option value="start_asc">
-              Start Date — Oldest
-            </option>
-
-            <option value="start_desc">
-              Start Date — Newest
-            </option>
-
-            <option value="due_asc">
-              Due Date — Earliest
-            </option>
-
-            <option value="due_desc">
-              Due Date — Latest
-            </option>
-
-            <option value="priority_asc">
-              Priority — Low to High
-            </option>
-
-            <option value="priority_desc">
-              Priority — High to Low
-            </option>
-          </select>
-        </div>
-
-      </section>
+      <ProjectFilters
+        v-model:search="search"
+        v-model:status-filter="statusFilter"
+        v-model:priority-filter="priorityFilter"
+        v-model:sort-by="sortBy"
+      />
 
       <!-- Results -->
       <section class="results-section">
@@ -602,7 +300,11 @@ const filteredProjects = computed(() => {
 
             <p v-if="!pending">
               {{ filteredProjects.length }}
-              {{ filteredProjects.length === 1 ? 'project' : 'projects' }}
+              {{
+                filteredProjects.length === 1
+                  ? 'project'
+                  : 'projects'
+              }}
             </p>
           </div>
 
@@ -614,7 +316,10 @@ const filteredProjects = computed(() => {
           class="state-card"
         >
           <div class="spinner"></div>
-          <p>Loading projects...</p>
+
+          <p>
+            Loading projects...
+          </p>
         </div>
 
         <!-- Error -->
@@ -646,125 +351,12 @@ const filteredProjects = computed(() => {
         </div>
 
         <!-- Table -->
-        <div
+        <ProjectTable
           v-else
-          class="table-wrapper"
-        >
-
-          <table>
-
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>Client</th>
-                <th>Project</th>
-                <th>Status</th>
-                <th>Priority</th>
-                <th>Start Date</th>
-                <th>Due Date</th>
-                <th class="actions-column">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-
-            <tbody>
-
-              <tr
-                v-for="project in filteredProjects"
-                :key="project.id"
-              >
-
-                <td class="id-column">
-                  {{ project.id }}
-                </td>
-
-                <td>
-                  <strong>
-                    {{ project.client_name }}
-                  </strong>
-                </td>
-
-                <td>
-                  {{ project.project_name }}
-                </td>
-
-                <td>
-
-                  <span
-                    class="badge status-badge"
-                    :class="{
-                      'status-planning':
-                        project.status === 'Planning',
-
-                      'status-progress':
-                        project.status === 'In Progress',
-
-                      'status-hold':
-                        project.status === 'On Hold',
-
-                      'status-completed':
-                        project.status === 'Completed'
-                    }"
-                  >
-                    {{ project.status }}
-                  </span>
-
-                </td>
-
-                <td>
-
-                  <span
-                    class="badge priority-badge"
-                    :class="{
-                      'priority-low':
-                        project.priority === 'Low',
-
-                      'priority-medium':
-                        project.priority === 'Medium',
-
-                      'priority-high':
-                        project.priority === 'High'
-                    }"
-                  >
-                    {{ project.priority }}
-                  </span>
-
-                </td>
-
-                <td>
-                  {{ project.start_date.substring(0, 10) }}
-                </td>
-
-                <td>
-                  {{ project.due_date.substring(0, 10) }}
-                </td>
-
-                <td class="actions">
-
-                  <button
-                    class="edit-button"
-                    @click="editProject(project)"
-                  >
-                    Edit
-                  </button>
-
-                  <button
-                    class="delete-button"
-                    @click="deleteProject(project.id)"
-                  >
-                    Delete
-                  </button>
-
-                </td>
-
-              </tr>
-
-            </tbody>
-
-          </table>
-
-        </div>
+          :projects="filteredProjects"
+          @edit="editProject"
+          @delete="deleteProject"
+        />
 
       </section>
 
@@ -846,7 +438,8 @@ button {
   background: white;
   border: 1px solid #e5e7eb;
   border-radius: 10px;
-  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
+  box-shadow:
+    0 2px 8px rgba(15, 23, 42, 0.04);
 }
 
 /* Buttons */
@@ -928,7 +521,8 @@ button {
 
 .form-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns:
+    repeat(2, 1fr);
   gap: 18px;
 }
 
@@ -991,17 +585,14 @@ textarea {
 
 .filters-card {
   display: grid;
-  grid-template-columns: 2fr 1fr 1fr 1fr;
+  grid-template-columns:
+    2fr 1fr 1fr 1fr;
   gap: 16px;
   padding: 20px;
   margin-bottom: 30px;
 }
 
 .filter-item {
-  min-width: 0;
-}
-
-.search-item {
   min-width: 0;
 }
 
@@ -1037,7 +628,8 @@ textarea {
   background: white;
   border: 1px solid #e5e7eb;
   border-radius: 10px;
-  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
+  box-shadow:
+    0 2px 8px rgba(15, 23, 42, 0.04);
 }
 
 table {
@@ -1131,7 +723,7 @@ tbody tr:hover {
   color: #b91c1c;
 }
 
-/* Empty / Loading */
+/* State */
 
 .state-card {
   background: white;
