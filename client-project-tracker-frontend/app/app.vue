@@ -16,6 +16,10 @@ const modalRef = ref<any | null>(null)
 const editingProject = ref<any | null>(null)
 const formError = ref('')
 
+const deletingProject = ref<any | null>(null)
+const isDeleting = ref(false)
+const deleteError = ref('')
+
 const search = ref('')
 const statusFilter = ref('')
 const priorityFilter = ref('')
@@ -333,6 +337,16 @@ const filteredProjects = computed(() => {
         @close="closeModal"
       />
 
+      <!-- Delete modal -->
+      <DeleteProjectModal
+        v-if="deletingProject"
+        :project="deletingProject"
+        :error="deleteError"
+        :pending="isDeleting"
+        @confirm="deleteProject"
+        @cancel="closeDeleteModal"
+      />
+
       <!-- Filters -->
       <ProjectFilters
         v-model:search="search"
@@ -408,7 +422,7 @@ const filteredProjects = computed(() => {
           v-else
           :projects="filteredProjects"
           @edit="editProject"
-          @delete="deleteProject"
+          @delete="openDeleteModal"
         />
 
       </section>

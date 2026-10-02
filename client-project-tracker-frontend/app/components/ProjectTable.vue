@@ -5,7 +5,7 @@ defineProps<{
 
 const emit = defineEmits<{
   edit: [project: any]
-  delete: [id: number]
+  delete: [project: any]
 }>()
 </script>
 
@@ -115,7 +115,7 @@ const emit = defineEmits<{
 
             <button
               class="delete-button"
-              @click="emit('delete', project.id)"
+              @click="emit('delete', project)"
             >
               Delete
             </button>
