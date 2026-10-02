@@ -21,6 +21,30 @@ const form = ref({
   due_date: ''
 })
 
+const initialForm = ref({ ...form.value })
+
+const showDiscardPrompt = ref(false)
+
+const isDirty = computed(
+  () =>
+    JSON.stringify(form.value) !==
+    JSON.stringify(initialForm.value)
+)
+
+function resetForm() {
+  form.value = {
+    client_name: '',
+    project_name: '',
+    description: '',
+    status: 'Planning',
+    priority: 'Medium',
+    start_date: '',
+    due_date: ''
+  }
+
+  initialForm.value = { ...form.value }
+}
+
 watch(
   () => props.project,
   (project) => {
@@ -34,6 +58,8 @@ watch(
         start_date: project.start_date.substring(0, 10),
         due_date: project.due_date.substring(0, 10)
       }
+
+      initialForm.value = { ...form.value }
     } else {
       resetForm()
     }
@@ -41,35 +67,43 @@ watch(
   { immediate: true }
 )
 
-function resetForm() {
-  form.value = {
-    client_name: '',
-    project_name: '',
-    description: '',
-    status: 'Planning',
-    priority: 'Medium',
-    start_date: '',
-    due_date: ''
-  }
-}
-
 function submitForm() {
   emit('save', { ...form.value })
 }
 
-function close() {
+function requestClose() {
+  if (isDirty.value) {
+    showDiscardPrompt.value = true
+
+    return
+  }
+
   emit('close')
+}
+
+function discardChanges() {
+  showDiscardPrompt.value = false
+
+  emit('close')
+}
+
+function keepEditing() {
+  showDiscardPrompt.value = false
 }
 
 function onOverlayClick(event: MouseEvent) {
   if (event.target === event.currentTarget) {
-    close()
+    requestClose()
   }
 }
 
 function onKeydown(event: KeyboardEvent) {
+  if (showDiscardPrompt.value) {
+    return
+  }
+
   if (event.key === 'Escape') {
-    close()
+    requestClose()
   }
 }
 
@@ -85,6 +119,8 @@ onBeforeUnmount(() => {
   document.body.style.overflow = previousOverflow
   document.removeEventListener('keydown', onKeydown)
 })
+
+defineExpose({ requestClose })
 </script>
 
 <template>
@@ -120,7 +156,7 @@ onBeforeUnmount(() => {
             type="button"
             class="modal-close"
             aria-label="Close"
-            @click="close"
+            @click="requestClose"
           >
             &times;
           </button>
@@ -272,7 +308,7 @@ onBeforeUnmount(() => {
             <button
               type="button"
               class="secondary-button"
-              @click="close"
+              @click="requestClose"
             >
               Cancel
             </button>
@@ -293,6 +329,13 @@ onBeforeUnmount(() => {
 
       </div>
     </div>
+
+    <!-- Unsaved changes prompt -->
+    <DiscardChangesModal
+      v-if="showDiscardPrompt"
+      @discard="discardChanges"
+      @keep="keepEditing"
+    />
   </Teleport>
 </template>
 

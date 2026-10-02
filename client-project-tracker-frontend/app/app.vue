@@ -9,6 +9,7 @@ const {
 } = await useFetch(`${config.public.apiBase}/projects`)
 
 const showModal = ref(false)
+const modalRef = ref<any | null>(null)
 const editingProject = ref<any | null>(null)
 const formError = ref('')
 
@@ -258,7 +259,7 @@ const filteredProjects = computed(() => {
           class="primary-button"
           @click="
             showModal
-              ? closeModal()
+              ? modalRef?.requestClose()
               : openAddForm()
           "
         >
@@ -274,6 +275,7 @@ const filteredProjects = computed(() => {
       <!-- Modal -->
       <ProjectModal
         v-if="showModal"
+        ref="modalRef"
         :project="editingProject"
         :error="formError"
         @save="saveProject"
