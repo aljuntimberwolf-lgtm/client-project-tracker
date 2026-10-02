@@ -6,5 +6,11 @@ export default defineNuxtConfig({
     public: {
       apiBase: ''
     }
-  }
+  },
+  components: [
+    {
+      path: '~/components',
+      pathPrefix: false
+    }
+  ]
 })

@@ -8,7 +8,7 @@ const {
   refresh
 } = await useFetch(`${config.public.apiBase}/projects`)
 
-const showForm = ref(false)
+const showModal = ref(false)
 const editingProject = ref<any | null>(null)
 const formError = ref('')
 
@@ -20,17 +20,17 @@ const sortBy = ref('')
 function openAddForm() {
   editingProject.value = null
   formError.value = ''
-  showForm.value = true
+  showModal.value = true
 }
 
 function editProject(project: any) {
   editingProject.value = project
   formError.value = ''
-  showForm.value = true
+  showModal.value = true
 }
 
-function cancelForm() {
-  showForm.value = false
+function closeModal() {
+  showModal.value = false
   editingProject.value = null
   formError.value = ''
 }
@@ -63,7 +63,7 @@ async function saveProject(formData: any) {
       )
     }
 
-    cancelForm()
+    closeModal()
 
     await refresh()
   } catch (error: any) {
@@ -257,13 +257,13 @@ const filteredProjects = computed(() => {
         <button
           class="primary-button"
           @click="
-            showForm
-              ? cancelForm()
+            showModal
+              ? closeModal()
               : openAddForm()
           "
         >
           {{
-            showForm
+            showModal
               ? 'Cancel'
               : '+ Add Project'
           }}
@@ -271,13 +271,13 @@ const filteredProjects = computed(() => {
 
       </header>
 
-      <!-- Form -->
-      <ProjectForm
-        v-if="showForm"
+      <!-- Modal -->
+      <ProjectModal
+        v-if="showModal"
         :project="editingProject"
         :error="formError"
         @save="saveProject"
-        @cancel="cancelForm"
+        @close="closeModal"
       />
 
       <!-- Filters -->
@@ -494,11 +494,6 @@ button {
 }
 
 /* Form */
-
-.form-card {
-  padding: 25px;
-  margin-bottom: 25px;
-}
 
 .section-header {
   margin-bottom: 25px;
