@@ -15,6 +15,7 @@ const formError = ref('')
 const search = ref('')
 const statusFilter = ref('')
 const priorityFilter = ref('')
+const sortBy = ref('')
 
 const form = ref({
   client_name: '',
@@ -56,11 +57,6 @@ function editProject(project: any) {
 
   formError.value = ''
   showForm.value = true
-}
-
-function cancelForm() {
-  showForm.value = false
-  resetForm()
 }
 
 async function saveProject() {
@@ -135,12 +131,6 @@ async function deleteProject(id: number) {
   }
 }
 
-/*
-|--------------------------------------------------------------------------
-| Search and Filters
-|--------------------------------------------------------------------------
-*/
-
 const filteredProjects = computed(() => {
   if (!projects.value) {
     return []
@@ -150,7 +140,7 @@ const filteredProjects = computed(() => {
     .trim()
     .toLowerCase()
 
-  return projects.value.filter((project: any) => {
+  const filtered = projects.value.filter((project: any) => {
     const matchesSearch =
       !searchValue ||
       project.client_name
@@ -176,6 +166,69 @@ const filteredProjects = computed(() => {
       matchesStatus &&
       matchesPriority
     )
+  })
+
+  return filtered.sort((a: any, b: any) => {
+    switch (sortBy.value) {
+
+      // Client Name
+      case 'client_asc':
+        return a.client_name.localeCompare(b.client_name)
+
+      case 'client_desc':
+        return b.client_name.localeCompare(a.client_name)
+
+      // Project Name
+      case 'project_asc':
+        return a.project_name.localeCompare(b.project_name)
+
+      case 'project_desc':
+        return b.project_name.localeCompare(a.project_name)
+
+      // Start Date
+      case 'start_asc':
+        return a.start_date.localeCompare(b.start_date)
+
+      case 'start_desc':
+        return b.start_date.localeCompare(a.start_date)
+
+      // Due Date
+      case 'due_asc':
+        return a.due_date.localeCompare(b.due_date)
+
+      case 'due_desc':
+        return b.due_date.localeCompare(a.due_date)
+
+      // Priority
+      case 'priority_asc': {
+        const priorityOrder: Record<string, number> = {
+          Low: 1,
+          Medium: 2,
+          High: 3
+        }
+
+        return (
+          priorityOrder[a.priority] -
+          priorityOrder[b.priority]
+        )
+      }
+
+      case 'priority_desc': {
+        const priorityOrder: Record<string, number> = {
+          Low: 1,
+          Medium: 2,
+          High: 3
+        }
+
+        return (
+          priorityOrder[b.priority] -
+          priorityOrder[a.priority]
+        )
+      }
+
+      default:
+        return 0
+    }
   })
 })
 </script>
@@ -257,21 +310,10 @@ const filteredProjects = computed(() => {
             id="status"
             v-model="form.status"
           >
-            <option value="Planning">
-              Planning
-            </option>
-
-            <option value="In Progress">
-              In Progress
-            </option>
-
-            <option value="On Hold">
-              On Hold
-            </option>
-
-            <option value="Completed">
-              Completed
-            </option>
+            <option value="Planning">Planning</option>
+            <option value="In Progress">In Progress</option>
+            <option value="On Hold">On Hold</option>
+            <option value="Completed">Completed</option>
           </select>
         </div>
 
@@ -284,17 +326,9 @@ const filteredProjects = computed(() => {
             id="priority"
             v-model="form.priority"
           >
-            <option value="Low">
-              Low
-            </option>
-
-            <option value="Medium">
-              Medium
-            </option>
-
-            <option value="High">
-              High
-            </option>
+            <option value="Low">Low</option>
+            <option value="Medium">Medium</option>
+            <option value="High">High</option>
           </select>
         </div>
 
@@ -338,7 +372,7 @@ const filteredProjects = computed(() => {
       </form>
     </div>
 
-    <!-- Search and Filters -->
+    <!-- Search, Filters and Sorting -->
     <div class="filters">
 
       <div class="search-box">
@@ -363,25 +397,11 @@ const filteredProjects = computed(() => {
           id="status-filter"
           v-model="statusFilter"
         >
-          <option value="">
-            All Statuses
-          </option>
-
-          <option value="Planning">
-            Planning
-          </option>
-
-          <option value="In Progress">
-            In Progress
-          </option>
-
-          <option value="On Hold">
-            On Hold
-          </option>
-
-          <option value="Completed">
-            Completed
-          </option>
+          <option value="">All Statuses</option>
+          <option value="Planning">Planning</option>
+          <option value="In Progress">In Progress</option>
+          <option value="On Hold">On Hold</option>
+          <option value="Completed">Completed</option>
         </select>
       </div>
 
@@ -394,20 +414,69 @@ const filteredProjects = computed(() => {
           id="priority-filter"
           v-model="priorityFilter"
         >
+          <option value="">All Priorities</option>
+          <option value="Low">Low</option>
+          <option value="Medium">Medium</option>
+          <option value="High">High</option>
+        </select>
+      </div>
+
+      <div>
+        <label for="sort">
+          Sort By
+        </label>
+
+        <select
+          id="sort"
+          v-model="sortBy"
+        >
           <option value="">
-            All Priorities
+            Default
           </option>
 
-          <option value="Low">
-            Low
+          <!-- Client Name FIRST -->
+          <option value="client_asc">
+            Client Name A → Z
           </option>
 
-          <option value="Medium">
-            Medium
+          <option value="client_desc">
+            Client Name Z → A
           </option>
 
-          <option value="High">
-            High
+          <!-- Project Name -->
+          <option value="project_asc">
+            Project Name A → Z
+          </option>
+
+          <option value="project_desc">
+            Project Name Z → A
+          </option>
+
+          <!-- Start Date -->
+          <option value="start_asc">
+            Start Date — Oldest
+          </option>
+
+          <option value="start_desc">
+            Start Date — Newest
+          </option>
+
+          <!-- Due Date -->
+          <option value="due_asc">
+            Due Date — Earliest
+          </option>
+
+          <option value="due_desc">
+            Due Date — Latest
+          </option>
+
+          <!-- Priority -->
+          <option value="priority_asc">
+            Priority — Low to High
+          </option>
+
+          <option value="priority_desc">
+            Priority — High to Low
           </option>
         </select>
       </div>
@@ -607,7 +676,7 @@ textarea {
 
 .filters {
   display: grid;
-  grid-template-columns: 2fr 1fr 1fr;
+  grid-template-columns: 2fr 1fr 1fr 1fr;
   gap: 16px;
   background: white;
   padding: 20px;
