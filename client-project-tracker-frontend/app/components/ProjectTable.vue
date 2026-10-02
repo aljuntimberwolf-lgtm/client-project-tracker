@@ -1,17 +1,23 @@
 <script setup lang="ts">
+import { PRIORITY_CLASSES, STATUS_CLASSES } from '~/constants/project'
+import type { Project } from '~/types/project'
+
 defineProps<{
-  projects: any[]
+  projects: Project[]
 }>()
 
 const emit = defineEmits<{
-  edit: [project: any]
-  delete: [project: any]
+  edit: [project: Project]
+  delete: [project: Project]
 }>()
+
+function formatDate(value: string) {
+  return value.substring(0, 10)
+}
 </script>
 
 <template>
   <div class="table-wrapper">
-
     <table>
 
       <thead>
@@ -23,89 +29,52 @@ const emit = defineEmits<{
           <th>Priority</th>
           <th>Start Date</th>
           <th>Due Date</th>
-          <th class="actions-column">
-            Actions
-          </th>
+          <th class="actions-column">Actions</th>
         </tr>
       </thead>
 
-      <tbody>
-
+      <TransitionGroup
+        tag="tbody"
+        name="row"
+        appear
+      >
         <tr
-          v-for="project in projects"
+          v-for="(project, index) in projects"
           :key="project.id"
+          :style="{ transitionDelay: `${Math.min(index, 10) * 40}ms` }"
         >
+          <td class="id-column">{{ project.id }}</td>
 
-          <td class="id-column">
-            {{ project.id }}
-          </td>
+          <td><strong>{{ project.client_name }}</strong></td>
 
-          <td>
-            <strong>
-              {{ project.client_name }}
-            </strong>
-          </td>
-
-          <td>
-            {{ project.project_name }}
-          </td>
+          <td>{{ project.project_name }}</td>
 
           <!-- Status -->
           <td>
-
             <span
-              class="badge status-badge"
-              :class="{
-                'status-planning':
-                  project.status === 'Planning',
-
-                'status-progress':
-                  project.status === 'In Progress',
-
-                'status-hold':
-                  project.status === 'On Hold',
-
-                'status-completed':
-                  project.status === 'Completed'
-              }"
+              class="badge"
+              :class="STATUS_CLASSES[project.status]"
             >
               {{ project.status }}
             </span>
-
           </td>
 
           <!-- Priority -->
           <td>
-
             <span
-              class="badge priority-badge"
-              :class="{
-                'priority-low':
-                  project.priority === 'Low',
-
-                'priority-medium':
-                  project.priority === 'Medium',
-
-                'priority-high':
-                  project.priority === 'High'
-              }"
+              class="badge"
+              :class="PRIORITY_CLASSES[project.priority]"
             >
               {{ project.priority }}
             </span>
-
           </td>
 
-          <td>
-            {{ project.start_date.substring(0, 10) }}
-          </td>
+          <td>{{ formatDate(project.start_date) }}</td>
 
-          <td>
-            {{ project.due_date.substring(0, 10) }}
-          </td>
+          <td>{{ formatDate(project.due_date) }}</td>
 
           <!-- Actions -->
           <td class="actions">
-
             <button
               class="edit-button"
               @click="emit('edit', project)"
@@ -119,14 +88,46 @@ const emit = defineEmits<{
             >
               Delete
             </button>
-
           </td>
-
         </tr>
-
-      </tbody>
+      </TransitionGroup>
 
     </table>
-
   </div>
 </template>
+
+<style scoped>
+.row-enter-active {
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+.row-leave-active {
+  transition: opacity 0.2s ease;
+}
+
+.row-move {
+  transition: transform 0.3s ease;
+}
+
+.row-enter-from {
+  opacity: 0;
+  transform: translateY(8px);
+}
+
+.row-leave-to {
+  opacity: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .row-enter-active,
+  .row-leave-active {
+    transition: none;
+  }
+
+  .row-enter-from,
+  .row-leave-to {
+    opacity: 0;
+    transform: none;
+  }
+}
+</style>

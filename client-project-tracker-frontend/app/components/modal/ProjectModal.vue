@@ -1,39 +1,25 @@
 <script setup lang="ts">
+import { PRIORITY_OPTIONS, STATUS_OPTIONS } from '~/constants/project'
+import type { Project, ProjectFormData } from '~/types/project'
+
 const props = defineProps<{
-  project?: any | null
+  project?: Project | null
   error?: string
   pending?: boolean
 }>()
 
 const emit = defineEmits<{
-  save: [project: any]
+  save: [project: ProjectFormData]
   close: []
 }>()
 
-const isEditing = computed(() => Boolean(props.project))
-
-const form = ref({
-  client_name: '',
-  project_name: '',
-  description: '',
-  status: 'Planning',
-  priority: 'Medium',
-  start_date: '',
-  due_date: ''
-})
-
-const initialForm = ref({ ...form.value })
-
+const dialog = ref<HTMLElement | null>(null)
 const showDiscardPrompt = ref(false)
 
-const isDirty = computed(
-  () =>
-    JSON.stringify(form.value) !==
-    JSON.stringify(initialForm.value)
-)
+const isEditing = computed(() => Boolean(props.project))
 
-function resetForm() {
-  form.value = {
+function createEmptyForm(): ProjectFormData {
+  return {
     client_name: '',
     project_name: '',
     description: '',
@@ -42,31 +28,45 @@ function resetForm() {
     start_date: '',
     due_date: ''
   }
-
-  initialForm.value = { ...form.value }
 }
+
+function formFromProject(project: Project): ProjectFormData {
+  return {
+    client_name: project.client_name,
+    project_name: project.project_name,
+    description: project.description ?? '',
+    status: project.status,
+    priority: project.priority,
+    start_date: project.start_date.substring(0, 10),
+    due_date: project.due_date.substring(0, 10)
+  }
+}
+
+const form = ref<ProjectFormData>(createEmptyForm())
+const savedForm = ref<ProjectFormData>(createEmptyForm())
+
+const isDirty = computed(
+  () => JSON.stringify(form.value) !== JSON.stringify(savedForm.value)
+)
+
+const submitLabel = computed(() => {
+  if (props.pending) {
+    return isEditing.value ? 'Updating...' : 'Creating...'
+  }
+
+  return isEditing.value ? 'Update Project' : 'Create Project'
+})
 
 watch(
   () => props.project,
   (project) => {
-    if (project) {
-      form.value = {
-        client_name: project.client_name,
-        project_name: project.project_name,
-        description: project.description || '',
-        status: project.status,
-        priority: project.priority,
-        start_date: project.start_date.substring(0, 10),
-        due_date: project.due_date.substring(0, 10)
-      }
-
-      initialForm.value = { ...form.value }
-    } else {
-      resetForm()
-    }
+    form.value = project ? formFromProject(project) : createEmptyForm()
+    savedForm.value = { ...form.value }
   },
   { immediate: true }
 )
+
+onMounted(() => dialog.value?.focus())
 
 function submitForm() {
   emit('save', { ...form.value })
@@ -79,7 +79,6 @@ function requestClose() {
 
   if (isDirty.value) {
     showDiscardPrompt.value = true
-
     return
   }
 
@@ -88,7 +87,6 @@ function requestClose() {
 
 function discardChanges() {
   showDiscardPrompt.value = false
-
   emit('close')
 }
 
@@ -102,267 +100,198 @@ function onOverlayClick(event: MouseEvent) {
   }
 }
 
-function onKeydown(event: KeyboardEvent) {
-  if (showDiscardPrompt.value) {
-    return
-  }
-
-  if (event.key === 'Escape') {
+useModalDismiss(() => {
+  if (!showDiscardPrompt.value) {
     requestClose()
   }
-}
-
-let previousOverflow = ''
-
-onMounted(() => {
-  previousOverflow = document.body.style.overflow
-  document.body.style.overflow = 'hidden'
-  document.addEventListener('keydown', onKeydown)
-})
-
-onBeforeUnmount(() => {
-  document.body.style.overflow = previousOverflow
-  document.removeEventListener('keydown', onKeydown)
 })
 
 defineExpose({ requestClose })
 </script>
 
 <template>
-  <Teleport to="body">
+  <div
+    class="modal-overlay"
+    @click="onOverlayClick"
+  >
     <div
-      class="modal-overlay"
-      @click="onOverlayClick"
+      ref="dialog"
+      class="modal-dialog dialog-panel"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="project-modal-title"
+      tabindex="-1"
     >
+      <header class="modal-header">
+        <div class="section-header">
+          <h2 id="project-modal-title">
+            {{ isEditing ? 'Edit Project' : 'Add Project' }}
+          </h2>
+
+          <p>
+            {{ isEditing ? 'Update the project information below.' : 'Enter the project information below.' }}
+          </p>
+        </div>
+
+        <button
+          type="button"
+          class="modal-close"
+          aria-label="Close"
+          :disabled="pending"
+          @click="requestClose"
+        >
+          &times;
+        </button>
+      </header>
+
       <div
-        class="modal-dialog"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="project-modal-title"
+        v-if="error"
+        class="error-message"
       >
+        {{ error }}
+      </div>
 
-        <header class="modal-header">
-
-          <div class="section-header">
-            <h2 id="project-modal-title">
-              {{ isEditing ? 'Edit Project' : 'Add Project' }}
-            </h2>
-
-            <p>
-              {{
-                isEditing
-                  ? 'Update the project information below.'
-                  : 'Enter the project information below.'
-              }}
-            </p>
+      <form
+        class="project-form"
+        :aria-busy="pending"
+        @submit.prevent="submitForm"
+      >
+        <div class="form-grid">
+          <!-- Client Name -->
+          <div class="form-group">
+            <label for="client_name">Client Name</label>
+            <input
+              id="client_name"
+              v-model="form.client_name"
+              type="text"
+              placeholder="Enter client name"
+              :disabled="pending"
+              required
+            />
           </div>
 
+          <!-- Project Name -->
+          <div class="form-group">
+            <label for="project_name">Project Name</label>
+            <input
+              id="project_name"
+              v-model="form.project_name"
+              type="text"
+              placeholder="Enter project name"
+              :disabled="pending"
+              required
+            />
+          </div>
+
+          <!-- Status -->
+          <div class="form-group">
+            <label for="status">Status</label>
+            <select
+              id="status"
+              v-model="form.status"
+              :disabled="pending"
+            >
+              <option
+                v-for="option in STATUS_OPTIONS"
+                :key="option"
+                :value="option"
+              >
+                {{ option }}
+              </option>
+            </select>
+          </div>
+
+          <!-- Priority -->
+          <div class="form-group">
+            <label for="priority">Priority</label>
+            <select
+              id="priority"
+              v-model="form.priority"
+              :disabled="pending"
+            >
+              <option
+                v-for="option in PRIORITY_OPTIONS"
+                :key="option"
+                :value="option"
+              >
+                {{ option }}
+              </option>
+            </select>
+          </div>
+
+          <!-- Start Date -->
+          <div class="form-group">
+            <label for="start_date">Start Date</label>
+            <input
+              id="start_date"
+              v-model="form.start_date"
+              type="date"
+              :disabled="pending"
+              required
+            />
+          </div>
+
+          <!-- Due Date -->
+          <div class="form-group">
+            <label for="due_date">Due Date</label>
+            <input
+              id="due_date"
+              v-model="form.due_date"
+              type="date"
+              :disabled="pending"
+              required
+            />
+          </div>
+        </div>
+
+        <!-- Description -->
+        <div class="form-group">
+          <label for="description">Description</label>
+          <textarea
+            id="description"
+            v-model="form.description"
+            placeholder="Enter project description"
+            :disabled="pending"
+            rows="4"
+          />
+        </div>
+
+        <!-- Actions -->
+        <div class="form-actions">
           <button
             type="button"
-            class="modal-close"
-            aria-label="Close"
+            class="secondary-button"
             :disabled="pending"
             @click="requestClose"
           >
-            &times;
+            Cancel
           </button>
 
-        </header>
-
-        <div
-          v-if="error"
-          class="error-message"
-        >
-          {{ error }}
+          <button
+            type="submit"
+            class="primary-button"
+            :disabled="pending"
+          >
+            <span
+              v-if="pending"
+              class="button-spinner"
+              aria-hidden="true"
+            />
+            {{ submitLabel }}
+          </button>
         </div>
-
-        <form
-          class="project-form"
-          :aria-busy="pending"
-          @submit.prevent="submitForm"
-        >
-
-          <div class="form-grid">
-
-            <!-- Client Name -->
-            <div class="form-group">
-              <label for="client_name">
-                Client Name
-              </label>
-
-              <input
-                id="client_name"
-                v-model="form.client_name"
-                type="text"
-                placeholder="Enter client name"
-                :disabled="pending"
-                required
-              />
-            </div>
-
-            <!-- Project Name -->
-            <div class="form-group">
-              <label for="project_name">
-                Project Name
-              </label>
-
-              <input
-                id="project_name"
-                v-model="form.project_name"
-                type="text"
-                placeholder="Enter project name"
-                :disabled="pending"
-                required
-              />
-            </div>
-
-            <!-- Status -->
-            <div class="form-group">
-              <label for="status">
-                Status
-              </label>
-
-              <select
-                id="status"
-                v-model="form.status"
-                :disabled="pending"
-              >
-                <option value="Planning">
-                  Planning
-                </option>
-
-                <option value="In Progress">
-                  In Progress
-                </option>
-
-                <option value="On Hold">
-                  On Hold
-                </option>
-
-                <option value="Completed">
-                  Completed
-                </option>
-              </select>
-            </div>
-
-            <!-- Priority -->
-            <div class="form-group">
-              <label for="priority">
-                Priority
-              </label>
-
-              <select
-                id="priority"
-                v-model="form.priority"
-                :disabled="pending"
-              >
-                <option value="Low">
-                  Low
-                </option>
-
-                <option value="Medium">
-                  Medium
-                </option>
-
-                <option value="High">
-                  High
-                </option>
-              </select>
-            </div>
-
-            <!-- Start Date -->
-            <div class="form-group">
-              <label for="start_date">
-                Start Date
-              </label>
-
-              <input
-                id="start_date"
-                v-model="form.start_date"
-                type="date"
-                :disabled="pending"
-                required
-              />
-            </div>
-
-            <!-- Due Date -->
-            <div class="form-group">
-              <label for="due_date">
-                Due Date
-              </label>
-
-              <input
-                id="due_date"
-                v-model="form.due_date"
-                type="date"
-                :disabled="pending"
-                required
-              />
-            </div>
-
-          </div>
-
-          <!-- Description -->
-          <div class="form-group">
-            <label for="description">
-              Description
-            </label>
-
-            <textarea
-              id="description"
-              v-model="form.description"
-              placeholder="Enter project description"
-              :disabled="pending"
-              rows="4"
-            ></textarea>
-          </div>
-
-          <!-- Actions -->
-          <div class="form-actions">
-            <button
-              type="button"
-              class="secondary-button"
-              :disabled="pending"
-              @click="requestClose"
-            >
-              Cancel
-            </button>
-
-            <button
-              type="submit"
-              class="primary-button"
-              :disabled="pending"
-            >
-              <span
-                v-if="pending"
-                class="button-spinner"
-                aria-hidden="true"
-              ></span>
-
-              {{
-                pending
-                  ? isEditing
-                    ? 'Updating...'
-                    : 'Creating...'
-                  : isEditing
-                    ? 'Update Project'
-                    : 'Create Project'
-              }}
-            </button>
-          </div>
-
-        </form>
-
-      </div>
+      </form>
     </div>
 
     <!-- Unsaved changes prompt -->
-    <DiscardChangesModal
-      v-if="showDiscardPrompt"
-      @discard="discardChanges"
-      @keep="keepEditing"
-    />
-  </Teleport>
+    <Transition name="modal-fade">
+      <DiscardChangesModal
+        v-if="showDiscardPrompt"
+        @discard="discardChanges"
+        @keep="keepEditing"
+      />
+    </Transition>
+  </div>
 </template>
 
 <style scoped>
@@ -386,6 +315,7 @@ defineExpose({ requestClose })
   border-radius: 10px;
   box-shadow: 0 20px 45px rgba(15, 23, 42, 0.18);
   padding: 25px;
+  outline: none;
 }
 
 .modal-header {
@@ -427,24 +357,6 @@ defineExpose({ requestClose })
 .project-form button:disabled {
   opacity: 0.65;
   cursor: not-allowed;
-}
-
-.button-spinner {
-  display: inline-block;
-  width: 14px;
-  height: 14px;
-  margin-right: 8px;
-  vertical-align: -2px;
-  border: 2px solid rgba(255, 255, 255, 0.35);
-  border-top-color: white;
-  border-radius: 50%;
-  animation: spin 0.7s linear infinite;
-}
-
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
 }
 
 @media (max-width: 700px) {
