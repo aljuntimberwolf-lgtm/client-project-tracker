@@ -12,6 +12,10 @@ const showForm = ref(false)
 const editingProjectId = ref<number | null>(null)
 const formError = ref('')
 
+const search = ref('')
+const statusFilter = ref('')
+const priorityFilter = ref('')
+
 const form = ref({
   client_name: '',
   project_name: '',
@@ -130,6 +134,50 @@ async function deleteProject(id: number) {
     )
   }
 }
+
+/*
+|--------------------------------------------------------------------------
+| Search and Filters
+|--------------------------------------------------------------------------
+*/
+
+const filteredProjects = computed(() => {
+  if (!projects.value) {
+    return []
+  }
+
+  const searchValue = search.value
+    .trim()
+    .toLowerCase()
+
+  return projects.value.filter((project: any) => {
+    const matchesSearch =
+      !searchValue ||
+      project.client_name
+        .toLowerCase()
+        .includes(searchValue) ||
+      project.project_name
+        .toLowerCase()
+        .includes(searchValue) ||
+      (project.description || '')
+        .toLowerCase()
+        .includes(searchValue)
+
+    const matchesStatus =
+      !statusFilter.value ||
+      project.status === statusFilter.value
+
+    const matchesPriority =
+      !priorityFilter.value ||
+      project.priority === priorityFilter.value
+
+    return (
+      matchesSearch &&
+      matchesStatus &&
+      matchesPriority
+    )
+  })
+})
 </script>
 
 <template>
@@ -163,7 +211,6 @@ async function deleteProject(id: number) {
 
       <form @submit.prevent="saveProject">
 
-        <!-- Client Name -->
         <div class="form-group">
           <label for="client_name">
             Client Name
@@ -177,7 +224,6 @@ async function deleteProject(id: number) {
           />
         </div>
 
-        <!-- Project Name -->
         <div class="form-group">
           <label for="project_name">
             Project Name
@@ -191,7 +237,6 @@ async function deleteProject(id: number) {
           />
         </div>
 
-        <!-- Description -->
         <div class="form-group">
           <label for="description">
             Description
@@ -203,7 +248,6 @@ async function deleteProject(id: number) {
           ></textarea>
         </div>
 
-        <!-- Status -->
         <div class="form-group">
           <label for="status">
             Status
@@ -231,7 +275,6 @@ async function deleteProject(id: number) {
           </select>
         </div>
 
-        <!-- Priority -->
         <div class="form-group">
           <label for="priority">
             Priority
@@ -255,7 +298,6 @@ async function deleteProject(id: number) {
           </select>
         </div>
 
-        <!-- Dates -->
         <div class="date-row">
 
           <div class="form-group">
@@ -286,7 +328,6 @@ async function deleteProject(id: number) {
 
         </div>
 
-        <!-- Submit -->
         <button
           type="submit"
           class="primary-button"
@@ -295,6 +336,82 @@ async function deleteProject(id: number) {
         </button>
 
       </form>
+    </div>
+
+    <!-- Search and Filters -->
+    <div class="filters">
+
+      <div class="search-box">
+        <label for="search">
+          Search
+        </label>
+
+        <input
+          id="search"
+          v-model="search"
+          type="text"
+          placeholder="Search client, project, or description..."
+        />
+      </div>
+
+      <div>
+        <label for="status-filter">
+          Status
+        </label>
+
+        <select
+          id="status-filter"
+          v-model="statusFilter"
+        >
+          <option value="">
+            All Statuses
+          </option>
+
+          <option value="Planning">
+            Planning
+          </option>
+
+          <option value="In Progress">
+            In Progress
+          </option>
+
+          <option value="On Hold">
+            On Hold
+          </option>
+
+          <option value="Completed">
+            Completed
+          </option>
+        </select>
+      </div>
+
+      <div>
+        <label for="priority-filter">
+          Priority
+        </label>
+
+        <select
+          id="priority-filter"
+          v-model="priorityFilter"
+        >
+          <option value="">
+            All Priorities
+          </option>
+
+          <option value="Low">
+            Low
+          </option>
+
+          <option value="Medium">
+            Medium
+          </option>
+
+          <option value="High">
+            High
+          </option>
+        </select>
+      </div>
+
     </div>
 
     <!-- Loading -->
@@ -310,8 +427,8 @@ async function deleteProject(id: number) {
     <!-- Projects -->
     <div v-else>
 
-      <p v-if="!projects?.length">
-        No projects found.
+      <p v-if="!filteredProjects.length">
+        No projects match your search or filters.
       </p>
 
       <table v-else>
@@ -332,7 +449,7 @@ async function deleteProject(id: number) {
         <tbody>
 
           <tr
-            v-for="project in projects"
+            v-for="project in filteredProjects"
             :key="project.id"
           >
 
@@ -455,7 +572,8 @@ button {
   margin-bottom: 16px;
 }
 
-.form-group label {
+.form-group label,
+.filters label {
   display: block;
   margin-bottom: 6px;
   font-weight: bold;
@@ -485,6 +603,16 @@ textarea {
 .error {
   color: #b91c1c;
   margin-bottom: 15px;
+}
+
+.filters {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr;
+  gap: 16px;
+  background: white;
+  padding: 20px;
+  margin-bottom: 20px;
+  border-radius: 6px;
 }
 
 table {
