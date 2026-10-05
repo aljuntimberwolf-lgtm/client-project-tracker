@@ -77,12 +77,7 @@ function requestClose() {
     return
   }
 
-  if (isDirty.value) {
-    showDiscardPrompt.value = true
-    return
-  }
-
-  emit('close')
+  showDiscardPrompt.value = true
 }
 
 function discardChanges() {
